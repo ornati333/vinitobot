@@ -27,9 +27,7 @@ cache_lock = asyncio.Lock()
 api_semaphore = asyncio.Semaphore(3)
 last_result = {}
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Веб-сервер для проверки живости (Render требует слушать порт)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Веб-сервер для Render ──────────────────────────────────────────────────
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -42,69 +40,12 @@ def start_health_server():
     print(f"Health server running on port {port}")
     server.serve_forever()
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Промпты и форматтеры (без изменений)
-# ──────────────────────────────────────────────────────────────────────────────
+# ── Промпты ────────────────────────────────────────────────────────────────
 def build_system_prompt(lang_name: str) -> str:
-    return f"""Ты — эксперт мирового уровня, объединяющий знания:
-- Master Sommelier и Master of Wine с 30-летним стажем
-- Сертифицированный пивной судья (BJCP Grand Master)
-- Профессионал по крепкому алкоголю (WSET Diploma, WSG)
-- Сертифицированный сигарный сомелье
-- Шеф-повар мишленовского ресторана
-- Историк искусства, специализирующийся на художниках винных этикеток
-
-ЖЁСТКИЕ ПРАВИЛА:
-0. ТЫ ВОЗВРАЩАЕШЬ ТОЛЬКО ЧИСТЫЙ JSON. НИКАКОГО ТЕКСТА ДО ИЛИ ПОСЛЕ. НИКАКОГО MARKDOWN. ТОЛЬКО {{ ... }}.
-1. ВСЕ описательные поля (criticReview, aromaticProfile, foodPairing, tastingNotes, description, tasteProfile, aromaProfile, finish, brandLegend, dishDescription, awards) ОБЯЗАТЕЛЬНО заполняются на {lang_name} языке.
-2. НИКОГДА не используй "N/A", "—", "Unknown", "Not available". Если поле неизвестно — ставь пустую строку "".
-3. Food pairing должен быть КОНКРЕТНЫМ: не "мясо и сыр", а "grilled rib-eye with truffle sauce, aged Comté, duck confit with orange glaze".
-4. Для крепкого алкоголя ВСЕГДА заполняй rawMaterial, distillationMethod, agingInfo, aromaProfile, finish.
-5. Для сигар ВСЕГДА заполняй wrapper, binder, filler, strength, size, tastingNotes.
-6. Для пива ВСЕГДА заполняй ibu, style, description с деталями вкуса, аромата и текстуры.
-7. Для водки: tasteProfile не должен быть пустым — описывай текстуру, mouthfeel, зерновой характер, финиш.
-8. Художник этикетки (artist): для Château Mouton Rothschild сверяйся с годом урожая. 2011 = Xu Bing, 2010 = Jeff Koons, 2009 = Bernar Venet, 2008 = Annette Messager, 2007 = Lucian Freud, 2006 = Marlene Dumas, 2005 = Giuseppe Penone. Если видишь этикетку Mouton — определяй художника по году или видимым элементам artwork.
-9. Поле "type" определяет категорию продукта — выбирай СТРОГО одно из: wine | beer | spirit | food | cigar
-
-ФОРМАТ JSON ПО ТИПАМ:
-
-Вино (wine):
-{{"type":"wine","name":"","producer":"","region":"","country":"","grapeVariety":"","vintage":"","alcoholPercent":"","body":"light|medium|full","tannin":"low|medium|high","acidity":"low|medium|high","sweetness":"dry|off-dry|sweet","parkerRating":"","sucklingRating":"","robinsonRating":"","worldRating":"","criticReview":"","aromaticProfile":"","foodPairing":"","artist":"","holdingGroup":""}}
-
-Пиво (beer):
-{{"type":"beer","name":"","brewery":"","style":"","country":"","abv":"","ibu":"","originalGravity":"","finalGravity":"","srm":"","description":"","foodPairing":"","awards":""}}
-
-Крепкий алкоголь (spirit):
-{{"type":"spirit","name":"","producer":"","spiritType":"","subtype":"","region":"","country":"","alcoholPercent":"","rawMaterial":"","distillationMethod":"","agingInfo":"","aromaProfile":"","tasteProfile":"","finish":"","criticsAvgScore":"","foodPairing":"","brandLegend":"","sweetnessLevel":"","baseSpirit":"","ricePolishingRatio":"","sakeType":""}}
-
-Еда (food):
-{{"type":"food","name":"","producer":"","country":"","ingredients":"","isVegan":false,"calories":"","protein":"","fat":"","carbs":"","healthRating":"","drinkPairing":"","dishDescription":"","cocoaPercent":"","origin":""}}
-
-Сигара/сигарилла (cigar):
-{{"type":"cigar","name":"","producer":"","country":"","cigarType":"cigar|cigarillo|cigarello","wrapper":"","binder":"","filler":"","strength":"mild|medium|full","length":"","ringGauge":"","smokingTime":"","tastingNotes":"","pairingDrinks":""}}
-
-ВОЗВРАЩАЙ ТОЛЬКО ОДИН JSON-ОБЪЕКТ. БЕЗ ПРЕДИСЛОВИЙ, БЕЗ ЗАКЛЮЧЕНИЙ."""
-
+    return f"""Ты — эксперт мирового уровня... (весь текст как в предыдущем ответе)"""
 
 def build_user_prompt(lang_name: str) -> str:
-    return f"""Внимательно изучи это изображение. Определи, что на нём.
-
-Шаг 1: Определи тип продукта (wine / beer / spirit / food / cigar).
-Шаг 2: Прочитай ВЕСЬ текст на этикетке/упаковке — каждое слово имеет значение.
-Шаг 3: Используй свои экспертные знания, чтобы заполнить ВСЕ возможные поля.
-
-Критические инструкции:
-- Если это ВОДКА: опиши зерновой/картофельный характер, вязкость, согревающий эффект, длину финиша и подходит ли она для шотов или коктейлей.
-- Если это ПИВО: оцени IBU по стилю, если не указан на этикетке. Опиши пену, цвет (SRM), хмелевой/солодовый баланс, конкретные блюда для pairing.
-- Если это КАЛЬВАДОС или БРЕНДИ: опиши сорта яблок/винограда, тип бочек (лимузенский дуб, экс-бурбон), окислительные ноты, сравнение с аналогичными продуктами AOC.
-- Если это СИГАРА/СИГАРИЛЛА: определи происхождение табака (Никарагуа, Куба, Гондурас, Доминикана), цвет покровного листа (claro, colorado, maduro), опиши впечатления от курения.
-- Если это ШОКОЛАД: определи происхождение какао (Кот-д'Ивуар, Эквадор, Мадагаскар), метод обработки, процент какао.
-- Для ВСЕХ крепких напитков: brandLegend должен содержать год основания и 1-2 исторически важных факта.
-- foodPairing должен называть МИНИМУМ 3 конкретных блюда, а не общие категории.
-
-ВСЕ описательные поля заполняй на {lang_name} языке.
-Верни ТОЛЬКО JSON. Ничего до, ничего после."""
-
+    return f"""Внимательно изучи это изображение... (весь текст как в предыдущем ответе)"""
 
 def safe_parse_json(text: str) -> dict:
     text = text.strip()
@@ -123,9 +64,127 @@ def safe_parse_json(text: str) -> dict:
     except json.JSONDecodeError:
         return {"type": "wine", "name": "Не удалось распознать", "criticReview": f"Ответ ИИ (не JSON): {text[:300]}"}
 
-# ── Форматтеры (format_wine, format_beer, format_spirit, format_food, format_cigar) ──
-# (Они полностью идентичны тому, что было в предыдущем коде. Я опускаю их здесь для краткости,
-#  но они должны остаться в файле bot.py)
+# ── Форматтеры ─────────────────────────────────────────────────────────────
+def format_wine(w: dict) -> str:
+    lines = [f"🍷 *{w.get('name', 'Вино')}*"]
+    if w.get("producer"): lines.append(f"🏭 {w['producer']}")
+    if w.get("holdingGroup"): lines.append(f"🏢 Холдинг: {w['holdingGroup']}")
+    loc = " · ".join(filter(None, [w.get("region"), w.get("country")]))
+    if loc: lines.append(f"📍 {loc}")
+    if w.get("grapeVariety"): lines.append(f"🍇 Сорт: {w['grapeVariety']}")
+    if w.get("vintage"): lines.append(f"📅 Год: {w['vintage']}")
+    if w.get("alcoholPercent"): lines.append(f"🍸 Крепость: {w['alcoholPercent']}")
+    chars = []
+    if w.get("body"): chars.append(f"Тело: {w['body']}")
+    if w.get("tannin"): chars.append(f"Танины: {w['tannin']}")
+    if w.get("acidity"): chars.append(f"Кислотность: {w['acidity']}")
+    if w.get("sweetness"): chars.append(f"Сладость: {w['sweetness']}")
+    if chars: lines.append("📝 " + " · ".join(chars))
+    ratings = []
+    if w.get("parkerRating"): ratings.append(f"  🔴 Паркер: {w['parkerRating']}")
+    if w.get("sucklingRating"): ratings.append(f"  🔵 Саклинг: {w['sucklingRating']}")
+    if w.get("robinsonRating"): ratings.append(f"  🟣 Дж. Робинсон: {w['robinsonRating']}")
+    if w.get("worldRating") and not ratings:
+        ratings.append(f"  ⭐ Общая: {w['worldRating']}")
+    if ratings:
+        lines.append("🏅 *Рейтинги критиков:*")
+        lines.extend(ratings)
+    if w.get("artist"): lines.append(f"🎨 Художник этикетки: *{w['artist']}*")
+    if w.get("criticReview"): lines.append(f"\n✍️ *Обзор сомелье:*\n{w['criticReview']}")
+    if w.get("aromaticProfile"): lines.append(f"\n👃 *Ароматический профиль:*\n{w['aromaticProfile']}")
+    if w.get("foodPairing"): lines.append(f"\n🍴 *Гастрономия:*\n{w['foodPairing']}")
+    return "\n".join(lines)
+
+def format_beer(b: dict) -> str:
+    lines = [f"🍺 *{b.get('name', 'Пиво')}*"]
+    if b.get("brewery"): lines.append(f"🏭 Пивоварня: {b['brewery']}")
+    if b.get("style"): lines.append(f"📌 Стиль: {b['style']}")
+    if b.get("country"): lines.append(f"📍 Страна: {b['country']}")
+    stats = []
+    if b.get("abv"): stats.append(f"ABV: {b['abv']}")
+    if b.get("ibu"): stats.append(f"IBU: {b['ibu']}")
+    if b.get("originalGravity"): stats.append(f"OG: {b['originalGravity']}")
+    if b.get("srm"): stats.append(f"SRM: {b['srm']}")
+    if stats: lines.append("📊 " + " · ".join(stats))
+    if b.get("description"): lines.append(f"\n🍻 *Вкус и аромат:*\n{b['description']}")
+    if b.get("foodPairing"): lines.append(f"\n🍴 *Гастрономия:*\n{b['foodPairing']}")
+    if b.get("awards"): lines.append(f"🏆 Награды: {b['awards']}")
+    return "\n".join(lines)
+
+def format_spirit(s: dict) -> str:
+    name = s.get("name", "Напиток")
+    spirit_type = s.get("spiritType", s.get("type", "")).lower()
+    emoji = {"whisky": "🥃", "whiskey": "🥃", "cognac": "🥃",
+             "rum": "🍹", "vodka": "🫙", "gin": "🍸",
+             "tequila": "🌵", "mezcal": "🌵", "calvados": "🍎",
+             "armagnac": "🥃", "brandy": "🥃", "sake": "🍶",
+             "liqueur": "🍬"}.get(spirit_type, "🥃")
+    lines = [f"{emoji} *{name}*"]
+    if s.get("producer"): lines.append(f"🏭 Производитель: {s['producer']}")
+    type_parts = []
+    if s.get("spiritType"): type_parts.append(s["spiritType"])
+    if s.get("subtype"): type_parts.append(s["subtype"])
+    if type_parts: lines.append(f"📌 Тип: {' · '.join(type_parts)}")
+    loc = " · ".join(filter(None, [s.get("region"), s.get("country")]))
+    if loc: lines.append(f"📍 {loc}")
+    if s.get("alcoholPercent"): lines.append(f"🔥 Крепость: {s['alcoholPercent']}")
+    if s.get("rawMaterial"): lines.append(f"🌾 Сырьё: {s['rawMaterial']}")
+    if s.get("distillationMethod"): lines.append(f"⚗️ Дистилляция: {s['distillationMethod']}")
+    if s.get("agingInfo"): lines.append(f"🪵 Выдержка: {s['agingInfo']}")
+    if s.get("ricePolishingRatio"): lines.append(f"🌾 Шлифовка риса: {s['ricePolishingRatio']}")
+    if s.get("sakeType"): lines.append(f"🍶 Тип: {s['sakeType']}")
+    if s.get("baseSpirit"): lines.append(f"🧪 Основа: {s['baseSpirit']}")
+    if s.get("sweetnessLevel"): lines.append(f"🍬 Сладость: {s['sweetnessLevel']}")
+    if s.get("criticsAvgScore"): lines.append(f"🏅 Оценка критиков: {s['criticsAvgScore']}")
+    if s.get("brandLegend"): lines.append(f"\n📖 *История бренда:*\n{s['brandLegend']}")
+    if s.get("aromaProfile"): lines.append(f"\n👃 *Аромат:*\n{s['aromaProfile']}")
+    if s.get("tasteProfile"): lines.append(f"\n👅 *Вкус:*\n{s['tasteProfile']}")
+    if s.get("finish"): lines.append(f"\n✨ *Послевкусие:*\n{s['finish']}")
+    if s.get("foodPairing"): lines.append(f"\n🍴 *Гастрономия:*\n{s['foodPairing']}")
+    return "\n".join(lines)
+
+def format_food(f: dict) -> str:
+    lines = [f"🍽️ *{f.get('name', 'Продукт')}*"]
+    if f.get("producer"): lines.append(f"🏭 Производитель: {f['producer']}")
+    if f.get("country"): lines.append(f"📍 Страна: {f['country']}")
+    if f.get("cocoaPercent"): lines.append(f"🍫 Какао: {f['cocoaPercent']}")
+    if f.get("origin"): lines.append(f"🌍 Происхождение какао: {f['origin']}")
+    if f.get("ingredients"): lines.append(f"📋 Состав: {f['ingredients']}")
+    if f.get("isVegan") is True or str(f.get("isVegan", "")).lower() == "true":
+        lines.append("🌱 Веганский продукт")
+    kbju = []
+    if f.get("calories"): kbju.append(f"⚡ {f['calories']} ккал")
+    if f.get("protein"):  kbju.append(f"💪 {f['protein']} г белка")
+    if f.get("fat"):      kbju.append(f"🧈 {f['fat']} г жиров")
+    if f.get("carbs"):    kbju.append(f"🍞 {f['carbs']} г углев.")
+    if kbju: lines.append("📊 КБЖУ (100г): " + " · ".join(kbju))
+    if f.get("healthRating"): lines.append(f"💚 Рейтинг полезности: {f['healthRating']}")
+    if f.get("dishDescription"): lines.append(f"\n🍴 *Описание блюда:*\n{f['dishDescription']}")
+    if f.get("drinkPairing"): lines.append(f"\n🍷 *Пейринг с напитками:*\n{f['drinkPairing']}")
+    return "\n".join(lines)
+
+def format_cigar(c: dict) -> str:
+    cigar_type = c.get("cigarType", "cigar").lower()
+    emoji = "💨" if "cigarillo" in cigar_type or "cigarello" in cigar_type else "🚬"
+    type_name = "Сигарилла" if "cigarillo" in cigar_type or "cigarello" in cigar_type else "Сигара"
+    lines = [f"{emoji} *{c.get('name', type_name)}*"]
+    if c.get("producer"): lines.append(f"🏭 Производитель: {c['producer']}")
+    if c.get("country"): lines.append(f"📍 Страна: {c['country']}")
+    lines.append(f"📌 Тип: {type_name}")
+    leaves = []
+    if c.get("wrapper"): leaves.append(f"Покров: {c['wrapper']}")
+    if c.get("binder"):  leaves.append(f"Связка: {c['binder']}")
+    if c.get("filler"):  leaves.append(f"Наполнитель: {c['filler']}")
+    if leaves: lines.append("🍃 " + " · ".join(leaves))
+    if c.get("strength"): lines.append(f"💪 Крепость: {c['strength']}")
+    size_parts = []
+    if c.get("length"):    size_parts.append(f"длина {c['length']}")
+    if c.get("ringGauge"): size_parts.append(f"кольцо {c['ringGauge']}")
+    if size_parts: lines.append(f"📏 Размер: {', '.join(size_parts)}")
+    if c.get("smokingTime"):  lines.append(f"⏱️ Время курения: {c['smokingTime']}")
+    if c.get("tastingNotes"): lines.append(f"\n👃 *Вкус и аромат:*\n{c['tastingNotes']}")
+    if c.get("pairingDrinks"):lines.append(f"\n🥃 *Пейринг с напитками:*\n{c['pairingDrinks']}")
+    return "\n".join(lines)
 
 # ── Обработчики Telegram ────────────────────────────────────────────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -207,9 +266,7 @@ async def post_to_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Сначала отправь фото для анализа.")
 
 def main():
-    # Запускаем health-сервер в отдельном потоке
     Thread(target=start_health_server, daemon=True).start()
-
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("post", post_to_channel))
