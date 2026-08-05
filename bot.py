@@ -10,11 +10,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = "8838770649:AAFytEaWcGTDtOURYI7GSVkOzBi_8LHBnaI"
-CHANNEL_ID = "@winesandl"
-OPENROUTER_API_KEY = "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"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL = "google/gemini-1.5-flash"
+BOT_TOKEN = "
 
 LANG_MAP = {
     "ru": "Russian", "kk": "Kazakh", "pt": "Portuguese",
